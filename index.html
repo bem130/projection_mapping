@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+    </head>
+    <body>
+        <div id="main">
+            <div>
+                Output Screen Preview
+                <div id="output_show_area">
+                    <canvas id="output_canvas_1"></canvas>
+                </div>
+            </div>
+            <div>
+                Input Video
+                <div id="input_show_area">
+                    <canvas id="input_canvas_1"></canvas>
+                </div>
+            </div>
+            <div>
+                <div id="config">
+                    <p>OpenCV: <span id="openCVisReady">Loading</span></p>
+                    <input type="file" id="fileinput" accept="video/*"><br>
+                    File Requirements: Video 16:9<br>
+                    Popup_Window Output <button data-stat="off" class="toggle" id="outputdebug"><span class="on">Production environment</span><span class="off">Adjustment environment</span></button><br>
+                    Adjustment_Env Background
+                    <select id="background">
+                        <option value="background1.png">1</option>
+                        <option value="background2.png">2</option>
+                    </select>
+                    <div id="rectangle1">
+                        <h3>Rectangle1</h3>
+                        <select>
+                            <option>input1</option>
+                        </select>
+                        <table class="input">
+                            <tr>
+                                <td>
+                                    ┌
+                                    <input type="number" value="0" step="100">
+                                    <input type="number" value="0" step="100">
+                                </td>
+                                <td>
+                                    ┐
+                                    <input type="number" value="1920" step="100">
+                                    <input type="number" value="0" step="100">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    └
+                                    <input type="number" value="0" step="100">
+                                    <input type="number" value="1080" step="100">
+                                </td>
+                                <td>
+                                    ┘
+                                    <input type="number" value="1920" step="100">
+                                    <input type="number" value="1080" step="100">
+                                </td>
+                            </tr>
+                        </table>
+                        <select>
+                            <option>screen1</option>
+                        </select>
+                        <table class="screen">
+                            <tr>
+                                <td>
+                                    ┌
+                                    <input type="number" value="0" step="100">
+                                    <input type="number" value="0" step="100">
+                                </td>
+                                <td>
+                                    ┐
+                                    <input type="number" value="1920" step="100">
+                                    <input type="number" value="0" step="100">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    └
+                                    <input type="number" value="0" step="100">
+                                    <input type="number" value="1080" step="100">
+                                </td>
+                                <td>
+                                    ┘
+                                    <input type="number" value="1920" step="100">
+                                    <input type="number" value="1080" step="100">
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
+<script> function openCVReady() { document.getElementById("openCVisReady").innerText = `Loading completed`; } </script>
+<script src="https://docs.opencv.org/3.4.1/opencv.js" onload="openCVReady()"></script>
+<script>
+
+let output_canvas_i = 1;
+let videoElement = document.createElement('video');
+
+window.onload = ()=>{
+    console.log("window loaded")
+    {
+        videoElement.src = "./test_pattern2.mp4";
+        videoElement.width = 1920;
+        videoElement.height = 1080;
+        videoElement.autoplay = true;
+        videoElement.muted = true;
+        videoElement.controls = true;
+        videoElement.loop = true;
+    }
+    SettingVideo(videoElement);
+}
+document.getElementById("fileinput").addEventListener('change', (e) => {
+    filename = e.target.files[0];
+    {
+        videoElement.src = URL.createObjectURL(filename);
+        videoElement.width = 1920;
+        videoElement.height = 1080;
+        videoElement.autoplay = true;
+        videoElement.muted = false;
+        videoElement.controls = true;
+        videoElement.loop = true;
+    }
+    SettingVideo(videoElement);
+}, false);
+
+
+function SettingVideo(videoElement) {
+    setTimeout(SettingVideo, 1000/30*5, videoElement);
+    let cap = new cv.VideoCapture(videoElement);
+    let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+    let dst = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+    try{
+        cap.read(src);
+        let pts1p = new Array(...document.querySelectorAll("#rectangle1 .input input")).map((x)=>{return Number(x.value)})
+        let pts2p = new Array(...document.querySelectorAll("#rectangle1 .screen input")).map((x)=>{return Number(x.value)})
+        {
+          //  console.log(pts1p,pts2p)
+            const pts1 = cv.matFromArray(4, 1, cv.CV_32FC2, pts1p);
+            const pts2 = cv.matFromArray(4, 1, cv.CV_32FC2, pts2p);
+            M = cv.getPerspectiveTransform(pts1,pts2)
+            cv.warpPerspective(src,dst,M,new cv.Size(1920,1080));
+        }
+        if (document.getElementById("outputdebug").dataset.stat!="on") {
+            cv.imshow('output_canvas_1',dst);
+            screen1.postMessage({
+                type: "screen",
+                screen: document.getElementById("output_canvas_1").toDataURL("image/png"),
+                title: "screen1",
+                background: `rgb(0,0,0)`,
+            } ,window.location.origin);
+        }
+        {
+            for (let i=0;i<4;i++) { // inputのマーカー
+                cv.circle(src,new cv.Point(pts1p[i*2+0],pts1p[i*2+1]),30,new cv.Scalar(0,255,255,255),cv.FILLED)
+            }
+            cv.imshow('input_canvas_1',src);
+        }
+        {
+            for (let i=0;i<4;i++) { // screenのマーカー
+                cv.circle(dst,new cv.Point(pts2p[i*2+0],pts2p[i*2+1]),30,new cv.Scalar(0,255,255,255),cv.FILLED)
+            }
+            cv.imshow('output_canvas_1',dst);
+        }
+        if (document.getElementById("outputdebug").dataset.stat=="on") {
+            screen1.postMessage({
+                type: "screen",
+                screen: document.getElementById("output_canvas_1").toDataURL("image/png"),
+                title: "screen1",
+                background: `url(${document.getElementById("background").value})`,
+            } ,window.location.origin);
+        }
+        src.delete();
+        dst.delete();
+    }catch(err){
+        console.error(err);
+        src.delete();
+        dst.delete();
+    }
+}
+
+{
+    let backgroundimg = document.getElementById("background")
+    backgroundimg.onchange = (e)=>{
+        console.log(e.target.value)
+        new Array(...document.querySelectorAll("#output_show_area > canvas")).forEach((x)=>{x.style.background = `url(${document.getElementById("background").value})`});
+    }
+}
+
+screen1 = openWin();
+function openWin() {
+    return window.open(
+        "./screen.html",
+        "screen1",
+        "location=no,left=0"
+    );
+}
+
+document.querySelectorAll("button.toggle").forEach((x)=>{ // トグルボタン
+    x.dataset.stat = x.dataset.stat=="on"? "on": "off";
+    x.addEventListener("click",(e)=>{
+        e.target.dataset.stat = e.target.dataset.stat=="off"? "on": "off";
+    }
+)})
+
+window.addEventListener("beforeunload",(e)=>{
+   // screen1.close()
+})
+</script>
+<style> /* toggle button */
+    button.toggle {
+        & * {
+            pointer-events: none;
+        }
+        &[data-stat="on"] .on {
+            display: none;
+        }
+        &[data-stat="off"] .off {
+            display: none;
+        }
+    }
+</style>
+<style>
+    body {
+        margin: 0px;
+        padding: 0px;
+    }
+    #main {
+        display: flex;
+        flex-flow: nowrap;
+        height: 100dvh;
+        width: 100dvw;
+    }
+    #main > div {
+        height: 100%;
+        width: 100%;
+    }
+    #main > div > div {
+        background-color: rgb(255, 255, 227);
+        width: 100%;
+    }
+    #output_show_area > canvas {
+        border: 1px solid rgb(147, 147, 147);
+        background: url("background1.png");
+        background-repeat: repeat;
+        width: 100%;
+    }
+    #input_show_area > canvas {
+        border: 1px solid rgb(147, 147, 147);
+        width: 100%;
+    }
+    input[type="number"] {
+        width: 50px;
+    }
+</style>

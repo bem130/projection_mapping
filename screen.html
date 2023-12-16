@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Unknown Screen</title>
+        <meta charset="utf-8">
+    </head>
+    <body>
+        <img id="screen">
+    </body>
+</html>
+<script>
+
+window.addEventListener("message",(e)=>{
+    console.log(e)
+    document.getElementById("screen").src = e.data.screen;
+    document.title = e.data.title;
+    document.getElementById("screen").style.background = e.data.background;
+})
+
+
+
+</script>
+<style>
+
+body {
+    background: rgb(0, 4, 65);
+    overflow: hidden;
+}
+
+img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100dvw;
+}
+
+
+</style>
