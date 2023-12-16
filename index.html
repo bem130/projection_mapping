@@ -8,7 +8,13 @@
             <div>
                 Output Screen Preview
                 <div id="output_show_area">
-                    <canvas id="output_canvas_1"></canvas>
+                    <canvas id="screen1"></canvas>
+                </div>
+            </div>
+            <div>
+                Rectangles Preview
+                <div id="rectangle_show_area">
+                    <canvas id="rectangle1"></canvas>
                 </div>
             </div>
             <div>
@@ -28,7 +34,7 @@
                         <option value="background1.png">1</option>
                         <option value="background2.png">2</option>
                     </select>
-                    <div id="rectangle1">
+                    <div class="rectangle">
                         <h3>Rectangle1</h3>
                         <select>
                             <option>input1</option>
@@ -98,7 +104,7 @@
 <script src="https://docs.opencv.org/3.4.1/opencv.js" onload="openCVReady()"></script>
 <script>
 
-let output_canvas_i = 1;
+let rectangle_i = 1;
 let videoElement = document.createElement('video');
 
 window.onload = ()=>{
@@ -128,59 +134,87 @@ document.getElementById("fileinput").addEventListener('change', (e) => {
     SettingVideo(videoElement);
 }, false);
 
+function overlayimg(backarr,addarr) {
+    for (let x=0;x<1920;x++) {
+        for (let y=0;y<1080;y++) {
+            let idx = y*1920+x
+            if (addarr[idx*4+3]!=0) {
+                backarr[idx*4+0] = addarr[idx*4+0]
+                backarr[idx*4+1] = addarr[idx*4+1]
+                backarr[idx*4+2] = addarr[idx*4+2]
+                backarr[idx*4+3] = addarr[idx*4+3]
+            }
+        }
+    }
+}
 
 function SettingVideo(videoElement) {
     setTimeout(SettingVideo, 1000/30*5, videoElement);
     let cap = new cv.VideoCapture(videoElement);
     let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
     let dst = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
-    try{
+    let ctx = [document.getElementById("screen1")].map((x)=>{x.width=1920;x.height=1080;return [x,new Uint8ClampedArray(1920*1080*4).fill(0)]});
         cap.read(src);
-        let pts1p = new Array(...document.querySelectorAll("#rectangle1 .input input")).map((x)=>{return Number(x.value)})
-        let pts2p = new Array(...document.querySelectorAll("#rectangle1 .screen input")).map((x)=>{return Number(x.value)})
-        {
-          //  console.log(pts1p,pts2p)
-            const pts1 = cv.matFromArray(4, 1, cv.CV_32FC2, pts1p);
-            const pts2 = cv.matFromArray(4, 1, cv.CV_32FC2, pts2p);
-            M = cv.getPerspectiveTransform(pts1,pts2)
-            cv.warpPerspective(src,dst,M,new cv.Size(1920,1080));
-        }
-        if (document.getElementById("outputdebug").dataset.stat!="on") {
-            cv.imshow('output_canvas_1',dst);
-            screen1.postMessage({
-                type: "screen",
-                screen: document.getElementById("output_canvas_1").toDataURL("image/png"),
-                title: "screen1",
-                background: `rgb(0,0,0)`,
-            } ,window.location.origin);
-        }
-        {
-            for (let i=0;i<4;i++) { // inputのマーカー
-                cv.circle(src,new cv.Point(pts1p[i*2+0],pts1p[i*2+1]),30,new cv.Scalar(0,255,255,255),cv.FILLED)
+        let rectangles = new Array(...document.querySelectorAll(".rectangle"));
+            //console.log(rectangles)
+            for (let recti in rectangles) {
+                let rectangle = rectangles[recti]
+                let pts1p = new Array(...rectangle.querySelectorAll(".input input")).map((x)=>{return Number(x.value)})
+                let pts2p = new Array(...rectangle.querySelectorAll(".screen input")).map((x)=>{return Number(x.value)})
+                {
+                 // console.log(pts1p,pts2p)
+                    const pts1 = cv.matFromArray(4, 1, cv.CV_32FC2, pts1p);
+                    const pts2 = cv.matFromArray(4, 1, cv.CV_32FC2, pts2p);
+                    M = cv.getPerspectiveTransform(pts1,pts2)
+                    cv.warpPerspective(src,dst,M,new cv.Size(1920,1080));
+                    cv.imshow(`rectangle${1+Number(recti)}`,dst);
+                    overlayimg(ctx[0][1],dst.data)
+                }
             }
-            cv.imshow('input_canvas_1',src);
-        }
-        {
-            for (let i=0;i<4;i++) { // screenのマーカー
-                cv.circle(dst,new cv.Point(pts2p[i*2+0],pts2p[i*2+1]),30,new cv.Scalar(0,255,255,255),cv.FILLED)
+                ctx[0][0].getContext("2d").putImageData(new ImageData(ctx[0][1],1920,1080),0,0)
+                if (document.getElementById("outputdebug").dataset.stat!="on") {
+                    let url = ctx[0][0].toDataURL("image/png");
+                    screen1.postMessage({
+                        type: "screen",
+                        screen: url,
+                        title: "screen1",
+                        background: `rgb(0,0,0)`,
+                    } ,window.location.origin);
+                }
+            for (let rectangle of rectangles) {
+                let pts1p = new Array(...rectangle.querySelectorAll(".input input")).map((x)=>{return Number(x.value)})
+                let pts2p = new Array(...rectangle.querySelectorAll(".screen input")).map((x)=>{return Number(x.value)})
+                {
+                    cv.imshow('input_canvas_1',src);
+                    let ctx = document.getElementById("input_canvas_1").getContext("2d");
+                    ctx.fillStyle = "rgb(0,255,255)"
+                    for (let i=0;i<4;i++) { // inputのマーカー
+                        ctx.beginPath();
+                        ctx.arc(pts1p[i*2+0],pts1p[i*2+1],50,0,6,false)
+                        ctx.fill();
+                    }
+                }
+                {
+                    let ctx_ = ctx[0][0].getContext("2d");
+                    ctx_.fillStyle = "rgb(0,255,255)"
+                    for (let i=0;i<4;i++) { // screenのマーカー
+                        ctx_.beginPath();
+                        ctx_.arc(pts2p[i*2+0],pts2p[i*2+1],50,0,6,false)
+                        ctx_.fill();
+                    }
+                }
             }
-            cv.imshow('output_canvas_1',dst);
-        }
         if (document.getElementById("outputdebug").dataset.stat=="on") {
+            let url = ctx[0][0].toDataURL("image/png");
             screen1.postMessage({
                 type: "screen",
-                screen: document.getElementById("output_canvas_1").toDataURL("image/png"),
+                screen: url,
                 title: "screen1",
                 background: `url(${document.getElementById("background").value})`,
             } ,window.location.origin);
         }
         src.delete();
         dst.delete();
-    }catch(err){
-        console.error(err);
-        src.delete();
-        dst.delete();
-    }
 }
 
 {
@@ -244,6 +278,12 @@ window.addEventListener("beforeunload",(e)=>{
         width: 100%;
     }
     #output_show_area > canvas {
+        border: 1px solid rgb(147, 147, 147);
+        background: url("background1.png");
+        background-repeat: repeat;
+        width: 100%;
+    }
+    #rectangle_show_area > canvas {
         border: 1px solid rgb(147, 147, 147);
         background: url("background1.png");
         background-repeat: repeat;
