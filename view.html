@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>
+        </title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+        <script src="projection.js"></script>
+    </head>
+    <body>
+        <button onclick="fullscreen()">fullscreen</button>
+        <button onclick="settestpattern()">test pattern</button>
+        <input type="file" id="fileinput" accept="video/*"><br>
+        <label>audio delay</label><input type="number" value="5" id="audiodelay">
+        <div>
+            <audio id="audioplay" class="preview"></audio>
+            <video id="inputvideo" class="preview" controls></video>
+            <canvas id="input" class="preview"></canvas>
+            <canvas id="output" class="preview"></canvas>
+        </div>
+    </body>
+</html>
+<script>
+window.addEventListener("load",settestpattern)
+
+var Mapping = new Array(1920*1080).fill(-1);
+let size = [1920,1080];
+let vertex = {
+    "input": {},
+    "output": {},
+}
+let poly = {}
+
+function settestpattern(e) {
+    filename = "./test_pattern2.mp4";
+    loadvideo(filename);
+}
+fileinput.addEventListener('change', (e) => {
+    filename = URL.createObjectURL(e.target.files[0]);
+    loadvideo(filename);
+}, false);
+
+function loadvideo(filename) {
+    inputvideo.oncanplay = ()=>{SettingCanvas(inputvideo);};
+    {
+        audioplay.src = filename;
+        audioplay.autoplay = true;
+        inputvideo.src = filename;
+        inputvideo.loop = true;
+        inputvideo.autoplay = true;
+        inputvideo.muted = true;
+    }
+}
+function SettingCanvas(elm) {
+    Mapping = new Array(elm.videoHeight*elm.videoWidth).fill(0).map((x,i)=>{return -1});
+    size[1] = elm.videoHeight;
+    size[0] = elm.videoWidth;
+    input.height = elm.videoHeight;
+    input.width = elm.videoWidth;
+    output.height = elm.videoHeight;
+    output.width = elm.videoWidth;
+    makemapimg();
+}
+
+const inputctx = input.getContext("2d");
+const outputctx = output.getContext("2d");
+
+updateOutputpreview();
+function updateOutputpreview() {
+    const start = performance.now();
+    const x = input.width;
+    const y = input.height;
+    inputctx.drawImage(inputvideo,0,0,x,y);
+    const imgdata = inputctx.getImageData(0,0,x,y).data;
+    const outimgdatadata = new Uint8ClampedArray(x*y*4);
+    for (let i = 0; i < y*x; i++) {
+            outimgdatadata[i*4+0] = imgdata[Mapping[i]*4+0]; // Red
+            outimgdatadata[i*4+1] = imgdata[Mapping[i]*4+1]; // Green
+            outimgdatadata[i*4+2] = imgdata[Mapping[i]*4+2]; // Blue
+            outimgdatadata[i*4+3] = imgdata[Mapping[i]*4+3]; // Alpha
+    }
+    const outimgdata = new ImageData(outimgdatadata,x,y);
+    outputctx.putImageData(outimgdata,0,0);
+    const end = performance.now();
+    audiodelay.value = end-start;
+
+    if (Math.abs(inputvideo.currentTime-audioplay.currentTime-(end-start)/1000)>0.1) {
+        audioplay.currentTime = inputvideo.currentTime-(end-start)/1000;
+    }
+    requestAnimationFrame(updateOutputpreview);
+}
+
+function fRead(filename) {
+    var hr = new XMLHttpRequest();
+    hr.open("GET", filename, false);
+    hr.send(null);
+    if (hr.status == 200 || hr.status == 304) {
+        return hr.responseText.replace(/\r\n/g, "\n");
+    }
+    else {
+        throw "err " + filename;
+    }
+};
+
+function fullscreen() {
+	output.requestFullscreen();
+}
+
+</script>
+<style>
+
+.preview {
+    width: 38%;
+}
+canvas {
+    background-color: black;
+    /* background: url("background1.png");
+    background-repeat: repeat; */
+}
+
+</style>

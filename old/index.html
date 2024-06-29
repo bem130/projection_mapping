@@ -33,68 +33,14 @@
                     <select id="background">
                         <option value="background1.png">1</option>
                         <option value="background2.png">2</option>
-                    </select>
-                    <div class="rectangle">
-                        <h3>Rectangle1</h3>
-                        <select>
-                            <option>input1</option>
-                        </select>
-                        <table class="input">
-                            <tr>
-                                <td>
-                                    ┌
-                                    <input type="number" value="0" step="100">
-                                    <input type="number" value="0" step="100">
-                                </td>
-                                <td>
-                                    ┐
-                                    <input type="number" value="1920" step="100">
-                                    <input type="number" value="0" step="100">
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    └
-                                    <input type="number" value="0" step="100">
-                                    <input type="number" value="1080" step="100">
-                                </td>
-                                <td>
-                                    ┘
-                                    <input type="number" value="1920" step="100">
-                                    <input type="number" value="1080" step="100">
-                                </td>
-                            </tr>
-                        </table>
-                        <select>
-                            <option>screen1</option>
-                        </select>
-                        <table class="screen">
-                            <tr>
-                                <td>
-                                    ┌
-                                    <input type="number" value="0" step="100">
-                                    <input type="number" value="0" step="100">
-                                </td>
-                                <td>
-                                    ┐
-                                    <input type="number" value="1920" step="100">
-                                    <input type="number" value="0" step="100">
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    └
-                                    <input type="number" value="0" step="100">
-                                    <input type="number" value="1080" step="100">
-                                </td>
-                                <td>
-                                    ┘
-                                    <input type="number" value="1920" step="100">
-                                    <input type="number" value="1080" step="100">
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
+                    </select><br>
+                    <textarea id="configdata">[
+    {
+        "input": [[0,0],[1920,0],[0,1080],[1920,1080]],
+        "mask": [[30,30],[1000,50],[0,1500]],
+        "screen": [[0,0],[1920,0],[0,1080],[1920,1080]]
+    }
+]</textarea>
                 </div>
             </div>
         </div>
@@ -153,14 +99,16 @@ function SettingVideo(videoElement) {
     let cap = new cv.VideoCapture(videoElement);
     let src = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
     let dst = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+    let config = JSON.parse(document.getElementById("configdata").value)
     let ctx = [document.getElementById("screen1")].map((x)=>{x.width=1920;x.height=1080;return [x,new Uint8ClampedArray(1920*1080*4).fill(0)]});
         cap.read(src);
-        let rectangles = new Array(...document.querySelectorAll(".rectangle"));
             //console.log(rectangles)
-            for (let recti in rectangles) {
-                let rectangle = rectangles[recti]
-                let pts1p = new Array(...rectangle.querySelectorAll(".input input")).map((x)=>{return Number(x.value)})
-                let pts2p = new Array(...rectangle.querySelectorAll(".screen input")).map((x)=>{return Number(x.value)})
+            for (let recti in config) {
+                let rect = config[recti]
+                let pts1p = rect.input.flat()
+                let pts2p = rect.screen.flat()
+                let mask = rect.mask
+                //console.log(mask)
                 {
                  // console.log(pts1p,pts2p)
                     const pts1 = cv.matFromArray(4, 1, cv.CV_32FC2, pts1p);
@@ -169,6 +117,19 @@ function SettingVideo(videoElement) {
                     cv.warpPerspective(src,dst,M,new cv.Size(1920,1080));
                     cv.imshow(`rectangle${1+Number(recti)}`,dst);
                     overlayimg(ctx[0][1],dst.data)
+                }
+                { // mask
+                    let co = document.createElement("canvas");
+                    co.width = 1920; co.height = 1080;
+                    let ctx_ = co.getContext("2d");
+                    ctx_.fillStyle = "rgb(0,0,0)";
+                    ctx_.beginPath();
+                    ctx_.moveTo(mask[0][0],mask[0][1]);
+                    for (let i=1;i<mask.length;i++) {
+                        ctx_.lineTo(mask[i][0],mask[i][1]);
+                    }
+                    ctx_.closePath();
+                    ctx_.fill();
                 }
             }
                 ctx[0][0].getContext("2d").putImageData(new ImageData(ctx[0][1],1920,1080),0,0)
@@ -181,9 +142,11 @@ function SettingVideo(videoElement) {
                         background: `rgb(0,0,0)`,
                     } ,window.location.origin);
                 }
-            for (let rectangle of rectangles) {
-                let pts1p = new Array(...rectangle.querySelectorAll(".input input")).map((x)=>{return Number(x.value)})
-                let pts2p = new Array(...rectangle.querySelectorAll(".screen input")).map((x)=>{return Number(x.value)})
+            for (let recti in config) {
+                let rect = config[recti]
+                let pts1p = rect.input.flat()
+                let pts2p = rect.screen.flat()
+                let mask = rect.mask
                 {
                     cv.imshow('input_canvas_1',src);
                     let ctx = document.getElementById("input_canvas_1").getContext("2d");

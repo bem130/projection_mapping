@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>
+        </title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+        <script src="projection.js"></script>
+    </head>
+    <body>
+        <button onclick="settestpattern()">test pattern</button>
+        <input type="file" id="fileinput" accept="video/*"><br>
+        <label>audio delay</label><input type="number" value="5" id="audiodelay">
+        <div>
+            <audio id="audioplay" class="preview"></audio>
+            <video id="inputvideo" class="preview" controls></video>
+            <canvas id="inputview" class="preview"></canvas>
+            <canvas id="inmapview" class="preview"></canvas>
+            <canvas id="outmapview" class="preview"></canvas>
+            <canvas id="outputpreview" class="preview"></canvas>
+        </div>
+    </body>
+</html>
+<script>
+
+
+window.addEventListener("load",settestpattern)
+
+var Mapping = new Array(1920*1080).fill(-1);
+let size = [1920,1080];
+let vertex = {
+    "input": {},
+    "output": {},
+}
+let poly = {}
+
+function settestpattern(e) {
+    filename = "./test_pattern2.mp4";
+    loadvideo(filename);
+}
+fileinput.addEventListener('change', (e) => {
+    filename = URL.createObjectURL(e.target.files[0]);
+    loadvideo(filename);
+}, false);
+
+function loadvideo(filename) {
+    inputvideo.oncanplay = ()=>{SettingCanvas(inputvideo);};
+    {
+        audioplay.src = filename;
+        audioplay.autoplay = true;
+        audioplay.loop = true;
+        inputvideo.src = filename;
+        inputvideo.autoplay = true;
+        inputvideo.muted = true;
+    }
+}
+function SettingCanvas(elm) {
+    Mapping = new Array(elm.videoHeight*elm.videoWidth).fill(0).map((x,i)=>{return -1});
+    size[1] = elm.videoHeight;
+    size[0] = elm.videoWidth;
+    inputview.height = elm.videoHeight;
+    inputview.width = elm.videoWidth;
+    inmapview.height = elm.videoHeight;
+    inmapview.width = elm.videoWidth;
+    outputpreview.height = elm.videoHeight;
+    outputpreview.width = elm.videoWidth;
+    outmapview.height = elm.videoHeight;
+    outmapview.width = elm.videoWidth;
+    makemapimg();
+}
+
+const inputviewctx = inputview.getContext("2d",{willReadFrequently:true});
+const inmapviewctx = inmapview.getContext("2d");
+const outmapviewctx = outmapview.getContext("2d");
+const outputpreviewctx = outputpreview.getContext("2d");
+
+updateOutputpreview();
+function updateOutputpreview() {
+    requestAnimationFrame(updateOutputpreview);
+    let start = performance.now();
+    let x = inputview.width;
+    let y = inputview.height;
+    inputviewctx.drawImage(inputvideo,0,0,x,y);
+    inmapviewctx.drawImage(inputvideo,0,0,x,y);
+    let imgdata = inputviewctx.getImageData(0,0,x,y);
+    let imgdatadata = imgdata.data;
+    let outimgdatadata = new Uint8ClampedArray(x*y*4);
+    for (let iy = 0; iy < y; iy++) {
+        for (let ix = 0; ix < x; ix++) {
+            let index = iy*x+ix; // index of position
+            outimgdatadata[index*4+0] = imgdatadata[Mapping[index]*4+0]; // Red
+            outimgdatadata[index*4+1] = imgdatadata[Mapping[index]*4+1]; // Green
+            outimgdatadata[index*4+2] = imgdatadata[Mapping[index]*4+2]; // Blue
+            outimgdatadata[index*4+3] = imgdatadata[Mapping[index]*4+3]; // Alpha
+        }
+    }
+    let outimgdata = new ImageData(outimgdatadata,inputview.width,inputview.height);
+    outputpreviewctx.putImageData(outimgdata,0,0);
+    outmapviewctx.putImageData(outimgdata,0,0);
+    canvasOverlay();
+    let end = performance.now();
+    audiodelay.value = end-start;
+
+    if (Math.abs(inputvideo.currentTime-audioplay.currentTime-(end-start)/1000)>0.1) {
+        audioplay.currentTime = inputvideo.currentTime-(end-start)/1000;
+    }
+}
+function canvasOverlay() {
+    { // inmap
+        for (let p of Object.keys(poly)) {
+            inmapviewctx.lineWidth = 10;
+            inmapviewctx.strokeStyle = "rgb(200,200,230)";
+            inmapviewctx.beginPath()
+            inmapviewctx.moveTo(...vertex["input"][poly[p][2]])
+            for (let i in poly[p]) {
+                inmapviewctx.lineTo(...vertex["input"][poly[p][i]])
+            }
+            inmapviewctx.stroke()
+        }
+        for (let p in vertex.input) {
+            inmapviewctx.fillStyle = `rgb(255,200,200)`;
+            inmapviewctx.font = "70px serif";
+            inmapviewctx.fillText(p,...vertex.input[p])
+        }
+    }
+    { // outmap
+        for (let p of Object.keys(poly)) {
+            outmapviewctx.lineWidth = 10;
+            outmapviewctx.strokeStyle = "rgb(200,200,230)";
+            outmapviewctx.beginPath()
+            outmapviewctx.moveTo(...vertex["output"][poly[p][2]])
+            for (let i in poly[p]) {
+                outmapviewctx.lineTo(...vertex["output"][poly[p][i]])
+            }
+            outmapviewctx.stroke()
+        }
+        for (let p in vertex.output) {
+            outmapviewctx.fillStyle = `rgb(255,200,200)`;
+            outmapviewctx.font = "70px serif";
+            outmapviewctx.fillText(p,...vertex.output[p])
+        }
+    }
+}
+
+function fRead(filename) {
+    var hr = new XMLHttpRequest();
+    hr.open("GET", filename, false);
+    hr.send(null);
+    if (hr.status == 200 || hr.status == 304) {
+        return hr.responseText.replace(/\r\n/g, "\n");
+    }
+    else {
+        throw "err " + filename;
+    }
+};
+</script>
+<style>
+
+.preview {
+    width: 38%;
+}
+canvas {
+    background: url("background1.png");
+    background-repeat: repeat;
+}
+
+</style>
